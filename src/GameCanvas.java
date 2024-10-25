@@ -1,114 +1,197 @@
-package src;
 
-import javax.swing.*;
+
+import javax.imageio.ImageIO;
+import javax.swing.JPanel;
 import java.awt.*;
-import java.awt.image.BufferedImage;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.awt.event.KeyEvent;
 
-public class GameCanvas extends JPanel implements Runnable
-{
+public class GameCanvas extends JPanel {
+    private int screenWidth = 1000;
+    private int screenHeight = 800;
+    private ArrayList<Rock> rocks;
+    private Boat boat;
+    private boolean gameOver;  // Tracks if the game is over
+    private boolean onTitleScreen = true;  // Title screen flag
+    private Image seaBackground;
 
-    private Game game;
-    private Graphics graphics;
-    Toolkit tk;
+    public GameCanvas() {
+        rocks = new ArrayList<>();
+        generateRocks();  // Static rocks generated once
+        boat = new Boat(100, screenHeight / 2);  // Start the boat in the middle
+        gameOver = false;  // Game starts with gameOver set to false
+        setUpMouseListener();  // Set up mouse listener for clicking "Start Game"
+        loadSeaBackground();  // Load the sea background
+    }
 
-    private final double rateTarget = 60.0;
-    private double waitTime = 1000.0 / rateTarget;
-    private double rate = 1000.0 / waitTime;
+    public void generateRocks() {
+        // Add small rocks
+        rocks.add(new Rock(200, 200, 50, 50, "src/assets/rock1.png"));  // Small rock
+        rocks.add(new Rock(500, 150, 60, 60, "src/assets/rock2.png"));  // Small rock
+        rocks.add(new Rock(650, 400, 55, 55, "src/assets/rock3.png"));  // Small rock
+        
+        // Add medium rocks
+        rocks.add(new Rock(300, 300, 100, 100, "src/assets/rock1.png"));  // Medium rock
+        rocks.add(new Rock(600, 250, 110, 110, "src/assets/rock2.png"));  // Medium rock
+        rocks.add(new Rock(700, 400, 90, 90, "src/assets/rock3.png"));  // Medium rock
+        
+        // Add large rocks
+        rocks.add(new Rock(800, 650, 150, 150, "src/assets/rock1.png"));  // Large rock
+        rocks.add(new Rock(600, 100, 120, 130, "src/assets/rock2.png"));  // Large rock
+        rocks.add(new Rock(750, 750, 140, 140, "src/assets/rock3.png"));  // Large rock
+        
+        // Add extra rocks for variety
+        rocks.add(new Rock(550, 350, 70, 70, "src/assets/rock1.png"));   // Small-medium rock
+        rocks.add(new Rock(350, 150, 80, 80, "src/assets/rock2.png"));   // Medium rock
+        rocks.add(new Rock(450, 450, 60, 60, "src/assets/rock3.png"));   // Small rock
+    }
+    
 
-    public int cursor = 0;
-    public int crosshairSize = 30;
+    // Mouse listener for the "Start Game" button on the title screen
+    private void setUpMouseListener() {
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (onTitleScreen) {
+                    // Check if the "Start Game" button is clicked
+                    int mouseX = e.getX();
+                    int mouseY = e.getY();
 
-    public GameCanvas(Game game, Graphics g, Toolkit tk)
-    {
-        this.game = game;
-        graphics = g;
-        this.tk = tk;
+                    // Button position
+                    int buttonX = screenWidth / 2 - 100;
+                    int buttonY = screenHeight / 2;
+                    int buttonWidth = 200;
+                    int buttonHeight = 50;
+
+                    if (mouseX >= buttonX && mouseY >= buttonY && mouseX <= buttonX + buttonWidth && mouseY <= buttonY + buttonHeight) {
+                        onTitleScreen = false;  // Transition from title screen to game
+                        resetGame();  // Initialize the game when starting
+                    }
+                }
+            }
+        });
     }
 
     @Override
-    public void run() {
-        while(true)
-        {
-            long startTime = System.nanoTime();
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
 
-            int width = tk.getScreenSize().width;
-            int height = tk.getScreenSize().height;
+        if (onTitleScreen) {
+            // Draw the title screen
+            drawTitleScreen(g);
+        } else if (gameOver) {
+            // Draw game over screen if game over
+            drawGameOverScreen(g);
+        } else {
+            // Draw the sea (map) and game elements if the game is ongoing
+            drawGameElements(g);
+        }
+    }
 
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = image.createGraphics();
+    private void drawTitleScreen(Graphics g) {
+        // Background
+        g.setColor(Color.CYAN);
+        g.fillRect(0, 0, screenWidth, screenHeight);
 
-            g2d.setColor(Color.CYAN);
-            g2d.fillRect(0, 0, width, height);
+        // Title text
+        g.setColor(Color.BLACK);
+        g.setFont(new Font("Arial", Font.BOLD, 48));
+        g.drawString("Pirate Battleship", screenWidth / 2 - 180, screenHeight / 3);
 
-            for (int i = 0; i < game.clouds.length; i++)
-            {
-                if (game.clouds[i] != null && !game.clouds[i].passed)
-                    game.clouds[i].drawCloud(g2d);
-            }
+        // Draw "Start Game" button
+        g.setColor(Color.BLACK);
+        g.fillRect(screenWidth / 2 - 100, screenHeight / 2, 200, 50);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.PLAIN, 24));
+        g.drawString("Start Game", screenWidth / 2 - 60, screenHeight / 2 + 35);
+    }
 
-            game.bird.drawBird(g2d);
+    private void drawGameOverScreen(Graphics g) {
+        // Draw the sea (map)
+        g.setColor(Color.CYAN);
+        g.fillRect(0, 0, screenWidth, screenHeight);
 
-            g2d.setColor(Color.RED);
-            g2d.drawOval(game.mouseX - crosshairSize, game.mouseY - crosshairSize, crosshairSize*2, crosshairSize*2);
-            g2d.drawLine(game.mouseX - crosshairSize, game.mouseY, game.mouseX+crosshairSize, game.mouseY);
-            g2d.drawLine(game.mouseX, game.mouseY-crosshairSize, game.mouseX, game.mouseY+crosshairSize);
+        // Draw rocks
+        for (Rock rock : rocks) {
+            rock.draw(g);
+        }
 
-            for (int i = 0; i < game.pipes.length; i++)
-            {
-                if (game.pipes[i] != null)
-                    game.pipes[i].drawPipe(g2d);
-            }
+        // Draw the boat
+        boat.draw(g);
 
-            g2d.setColor(Color.BLACK);
-            if (game.running) {
-                g2d.drawString(String.format("Score: %d", game.score), 25, 25);
-                g2d.drawString(String.format("High Score: %d", game.highScore), 25, 50);
-            } else {
-                g2d.drawString(String.format("%s Reset Game", cursor == 0 ? ">" : " "), 25, 25);
-                g2d.drawString(String.format("%s Exit Game", cursor == 1 ? ">" : " "), 25, 50);
-                String vol = "";
-                for (int i = 0; i < 11; i++)
-                {
-                    if ((int) (game.volume * 10) == i)
-                    {
-                        vol += "|";
-                    } else {
-                        vol += "-";
-                    }
+        // Game Over text
+        g.setColor(Color.BLACK);
+        g.setFont(new Font("Arial", Font.BOLD, 36));
+        g.drawString("GAME OVER", screenWidth / 2 - 120, screenHeight / 2 - 20);
+        g.setFont(new Font("Arial", Font.PLAIN, 20));
+        g.drawString("Press 'R' to Restart", screenWidth / 2 - 100, screenHeight / 2 + 20);
+    }
+
+    private void loadSeaBackground() {
+        try {
+            seaBackground = ImageIO.read(new File("src/assets/sea.gif"));  // Load sea background
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void drawGameElements(Graphics g) {
+        // Draw sea background
+        if (seaBackground != null) {
+            g.drawImage(seaBackground, 0, 0, screenWidth, screenHeight, null);
+        }
+
+        // Draw rocks
+        for (Rock rock : rocks) {
+            rock.draw(g);
+        }
+
+        // Draw the boat
+        boat.draw(g);
+    }
+
+    public void updateGame() {
+        if (!onTitleScreen && !gameOver) {
+            boat.updatePosition();  // Update boat position
+
+            // Check for collisions with rocks
+            for (Rock rock : rocks) {
+                if (boat.getBounds().intersects(rock.getBounds())) {
+                    // Trigger game over
+                    gameOver = true;  // Set game over state
+                    break;
                 }
-                g2d.drawString(String.format("%s Volume %s", cursor == 2 ? ">" : " ", vol), 25, 75);
-                g2d.drawString(String.format("%s Randomize Gaps %s", cursor == 3 ? ">" : " ", game.randomGaps ? "(ON)" : "(OFF)"), 25, 100);
-                String dif = "";
-                for (double i = 0.0; i <= 3.0; i+= 0.5)
-                {
-                    if (game.difficulty == i)
-                    {
-                        dif += "|";
-                    } else {
-                        dif += "-";
-                    }
-                }
-                g2d.drawString(String.format("%s Difficulty %s", cursor == 4 ? ">" : " ", dif), 25, 125);
-                g2d.drawString(String.format("%s Ramping %s", cursor == 5 ? ">" : " ", game.ramping ? "(ON)" : "(OFF)"), 25, 150);
-                g2d.drawString(String.format("%s Debug Mode %s", cursor == 6 ? ">" : " ", game.debug ? "(ON)" : "(OFF)"), 25, 175);
-            }
-            if (game.debug) {
-                g2d.drawString(String.format("FPS = %.1f", rate), 200, 25);
-                g2d.drawString(String.format("UPS = %.1f", game.rate), 200, 50);
             }
 
-            graphics.drawImage(image, 0, 0, null);
+            repaint();  // Repaint the screen after updating position
+        }
+    }
 
-            long sleep = (long) waitTime - (System.nanoTime() - startTime) / 1000000;
-            rate = 1000.0 / Math.max(waitTime - sleep, waitTime);
+    // Method to restart the game
+    public void resetGame() {
+        boat.resetPosition();  // Reset boat to starting position
+        gameOver = false;  // Reset the game over flag
+        repaint();  // Repaint the screen to reflect the reset state
+    }
 
-            try
-            {
-                Thread.sleep(Math.max(sleep, 0));
-            } catch (InterruptedException ex)
-            {
+    // Method to handle key press
+    public void handleKeyPress(int keyCode) {
+        if (keyCode == KeyEvent.VK_R && gameOver) {
+            resetGame();  // Restart the game if 'R' is pressed
+        } else if (!gameOver && !onTitleScreen) {
+            // Let the boat move if the game is not over or on title screen
+            boat.setDirection(keyCode);
+        }
+    }
 
-            }
+    // Method to stop the boat's movement when a key is released
+    public void handleKeyRelease(int keyCode) {
+        if (!gameOver && !onTitleScreen) {
+            boat.stopMoving();
         }
     }
 }
