@@ -1,8 +1,8 @@
 package src;
 
-import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import javax.swing.*;
 
 public class GameCanvas extends JPanel implements Runnable
 {
@@ -16,7 +16,7 @@ public class GameCanvas extends JPanel implements Runnable
     private double rate = 1000.0 / waitTime;
 
     public int cursor = 0;
-    public int crosshairSize = 30;
+    public int crosshairSize = 20;
 
     public GameCanvas(Game game, Graphics g, Toolkit tk)
     {
@@ -40,23 +40,23 @@ public class GameCanvas extends JPanel implements Runnable
             g2d.setColor(Color.CYAN);
             g2d.fillRect(0, 0, width, height);
 
+            game.tank.drawTank(g2d);
+
             for (int i = 0; i < game.clouds.length; i++)
             {
                 if (game.clouds[i] != null && !game.clouds[i].passed)
                     game.clouds[i].drawCloud(g2d);
             }
 
-            game.bird.drawBird(g2d);
-
             g2d.setColor(Color.RED);
             g2d.drawOval(game.mouseX - crosshairSize, game.mouseY - crosshairSize, crosshairSize*2, crosshairSize*2);
             g2d.drawLine(game.mouseX - crosshairSize, game.mouseY, game.mouseX+crosshairSize, game.mouseY);
             g2d.drawLine(game.mouseX, game.mouseY-crosshairSize, game.mouseX, game.mouseY+crosshairSize);
 
-            for (int i = 0; i < game.pipes.length; i++)
+            for (int i = 0; i < game.bombers.length; i++)
             {
-                if (game.pipes[i] != null)
-                    game.pipes[i].drawPipe(g2d);
+                if (game.bombers[i] != null)
+                    game.bombers[i].drawPipe(g2d);
             }
 
             g2d.setColor(Color.BLACK);

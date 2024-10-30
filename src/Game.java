@@ -1,17 +1,15 @@
 package src;
 
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import java.io.*;
 import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import javax.sound.sampled.FloatControl;
 import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
-import java.awt.image.BufferedImage;
-import java.io.*;
 
 public class Game implements Runnable
 {
@@ -21,15 +19,15 @@ public class Game implements Runnable
     public double waitTime = 1000.0 / rateTarget;
     public double rate = 1000 / waitTime;
 
-    public Bird bird;
+    public Tank tank;
     public int mouseX;
     public int mouseY;
     public int fireRate = 10;
     public int fireCounter = 0;
     public boolean firing = false;
 
-    public Pipe[] pipes = new Pipe[5];
-    private int pipeCount = 1;
+    public Bomber[] bombers = new Bomber[5];
+    private int bomberCount = 1;
 
     public int highScore = 0;
     public int score = 0;
@@ -42,10 +40,9 @@ public class Game implements Runnable
     public double difficulty = 0.0;
     public boolean ramping = false;
 
-    private int pipeWidth;
-    private int pipeHeight;
-    public BufferedImage pipeImage;
-    public BufferedImage flippedPipe;
+    private int bomberWidth;
+    private int bomberHeight;
+    public BufferedImage bomberImage;
 
     public BufferedImage[] cloudImage = new BufferedImage[21];
     private final int cloudCap = 20;
@@ -85,34 +82,23 @@ public class Game implements Runnable
                 }
             }
 
-            bird = new Bird(this, tk);
+            tank = new Tank(this, tk);
 
-            BufferedImage image = ImageIO.read(new File("pipe.png"));
+            BufferedImage image = ImageIO.read(new File("BomberPlane.png"));
 
-            pipeWidth = tk.getScreenSize().width / 16;
-            pipeHeight = (int)(((double)pipeWidth / (double)image.getWidth()) * image.getHeight());
+            bomberWidth = image.getWidth();
+            bomberHeight = image.getHeight();
 
-            Image temp = image.getScaledInstance(pipeWidth, pipeHeight, BufferedImage.SCALE_SMOOTH);
-            pipeImage = new BufferedImage(pipeWidth, pipeHeight, BufferedImage.TYPE_INT_ARGB);
-            Graphics g = pipeImage.getGraphics();
+            Image temp = image.getScaledInstance(bomberWidth, bomberHeight, BufferedImage.SCALE_SMOOTH);
+            bomberImage = new BufferedImage(bomberWidth, bomberHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics g = bomberImage.getGraphics();
             g.drawImage(temp, 0, 0, null);
             g.dispose();
 
-            AffineTransform at = new AffineTransform();
-            at.rotate(Math.PI, image.getWidth() / 2, image.getHeight() / 2);
-            AffineTransformOp ato = new AffineTransformOp(at, AffineTransformOp.TYPE_BILINEAR);
-            BufferedImage flipped = ato.filter(image, null);
+            Bomber bomber = new Bomber(this, tk, tk.getScreenSize().height / 2, bomberWidth, bomberHeight);
+            bombers[0] = bomber;
 
-            temp = flipped.getScaledInstance(pipeWidth, pipeHeight, BufferedImage.SCALE_SMOOTH);
-            flippedPipe = new BufferedImage(pipeWidth, pipeHeight, BufferedImage.TYPE_INT_ARGB);
-            g = flippedPipe.getGraphics();
-            g.drawImage(temp, 0, 0, null);
-            g.dispose();
-
-            Pipe pipe = new Pipe(this, tk, tk.getScreenSize().height / 2, pipeWidth, pipeHeight);
-            pipes[0] = pipe;
-
-            image = ImageIO.read(new File("clouds.png"));
+            image = ImageIO.read(new File("clouds2.png"));
             int fragHeight = image.getHeight() / 21;
             for (int i = 0; i < cloudImage.length; i++)
             {
@@ -134,6 +120,25 @@ public class Game implements Runnable
         Thread drawLoop = new Thread(canvas);
         drawLoop.start();
 
+        frame.addMouseListener(new MouseListener()
+        {
+            @Override
+            public void mouseClicked(MouseEvent arg0){}
+            @Override
+            public void mouseExited(MouseEvent arg0){}
+            @Override
+            public void mouseReleased(MouseEvent arg0){}
+            @Override
+            public void mousePressed(MouseEvent arg0)
+            {
+                if(running)
+                {
+                    tank.fire();
+                }
+            }
+            @Override
+            public void mouseEntered(MouseEvent arg0){}
+        });
         frame.addKeyListener(new KeyListener()
         {
             @Override
@@ -146,8 +151,8 @@ public class Game implements Runnable
             {
                 if(e.getKeyCode() == KeyEvent.VK_SPACE)
                 {
-                    if (running)
-                        bird.flap();
+                    if (running) {}
+                        //May implement later
                 }
                 if(e.getKeyCode() == KeyEvent.VK_ESCAPE)
                 {
@@ -213,11 +218,51 @@ public class Game implements Runnable
                             debug = !debug;
                     }
                 }
+                if(e.getKeyCode() == KeyEvent.VK_W)
+                {
+                    if (running)
+                        tank.moveNorth();
+                }
+                if(e.getKeyCode() == KeyEvent.VK_A)
+                {
+                    if (running)
+                        tank.moveWest();
+                }
+                if(e.getKeyCode() == KeyEvent.VK_S)
+                {
+                    if (running)
+                        tank.moveSouth();
+                }
+                if(e.getKeyCode() == KeyEvent.VK_D)
+                {
+                    if (running)
+                        tank.moveEast();
+                }
             }
 
             @Override
             public void keyReleased(KeyEvent e)
             {
+                if(e.getKeyCode() == KeyEvent.VK_W)
+                {
+                    if (running)
+                        tank.stopNorth();
+                }
+                if(e.getKeyCode() == KeyEvent.VK_A)
+                {
+                    if (running)
+                        tank.stopWest();
+                }
+                if(e.getKeyCode() == KeyEvent.VK_S)
+                {
+                    if (running)
+                        tank.stopSouth();
+                }
+                if(e.getKeyCode() == KeyEvent.VK_D)
+                {
+                    if (running)
+                        tank.stopEast();
+                }
             }
         });
 
@@ -312,12 +357,12 @@ public class Game implements Runnable
                         clouds[i].update();
                 }
 
-                bird.update();
-                for (int i = 0; i < pipes.length; i++) {
-                    if (pipes[i] == null)
+                tank.update();
+                for (int i = 0; i < bombers.length; i++) {
+                    if (bombers[i] == null)
                         continue;
 
-                    if (pipes[i].update()) {
+                    if (bombers[i].update()) {
                         score += 1;
 
                         if (ramping && score % 10 == 0)
@@ -356,19 +401,19 @@ public class Game implements Runnable
                         }).start();
                     }
 
-                    if (pipes[i].spawnable && pipes[i].xPos < 3 * tk.getScreenSize().width / 4) {
-                        pipes[i].spawnable = false;
+                    if (bombers[i].spawnable && bombers[i].xPos < 3 * tk.getScreenSize().width / 4) {
+                        bombers[i].spawnable = false;
                         int min = tk.getScreenSize().height / 4;
                         int range = min * 2;
                         int y = (int) (Math.random() * range) + min;
-                        Pipe pipe = new Pipe(this, tk, y, pipeWidth, pipeHeight);
-                        pipes[pipeCount] = pipe;
-                        pipeCount++;
-                        if (pipeCount >= pipes.length)
-                            pipeCount = 0;
+                        Bomber pipe = new Bomber(this, tk, y, bomberWidth, bomberHeight);
+                        bombers[bomberCount] = pipe;
+                        bomberCount++;
+                        if (bomberCount >= bombers.length)
+                            bomberCount = 0;
                     }
 
-                    if (bird.collide(pipes[i])) {
+                    if (tank.collide(bombers[i])) {
                         running = !running;
                     }
                 }
@@ -402,11 +447,11 @@ public class Game implements Runnable
             }
         }
 
-        bird.reset();
-        pipes = new Pipe[5];
-        Pipe p = new Pipe(this, tk, tk.getScreenSize().height / 2, pipeWidth, pipeHeight);
-        pipes[0] = p;
-        pipeCount = 1;
+        tank.reset();
+        bombers = new Bomber[5];
+        Bomber p = new Bomber(this, tk, tk.getScreenSize().height / 2, bomberWidth, bomberHeight);
+        bombers[0] = p;
+        bomberCount = 1;
         score = 0;
 
         clouds = new Cloud[cloudCap];

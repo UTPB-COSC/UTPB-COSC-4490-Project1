@@ -2,7 +2,7 @@ package src;
 
 import java.awt.*;
 
-public class Pipe
+public class Bomber
 {
     Game game;
 
@@ -11,7 +11,7 @@ public class Pipe
     public int yPos;
     public int xPos;
 
-    public double defaultVel = 3.0;
+    public double defaultVel = 4.0;
     public double xVel = 3.0;
 
     public int width;
@@ -21,7 +21,7 @@ public class Pipe
     private boolean scoreable = true;
     public boolean spawnable = true;
 
-    public Pipe(Game g, Toolkit tk, int y, int w, int h)
+    public Bomber(Game g, Toolkit tk, int y, int w, int h)
     {
         game = g;
         this.tk = tk;
@@ -43,8 +43,8 @@ public class Pipe
     public void drawPipe(Graphics g)
     {
         Graphics2D g2d = (Graphics2D) g;
-        g2d.drawImage(game.pipeImage, xPos, yPos, null);
-        g2d.drawImage(game.flippedPipe, xPos, yPos - gap - height, null);
+        g2d.drawImage(game.bomberImage, xPos, yPos, null);
+        g2d.drawImage(game.bomberImage, xPos, yPos - gap - height, null);
     }
 
     public boolean update()
