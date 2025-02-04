@@ -1,0 +1,12 @@
+TO DO List for System implementations
+"-" Means task to complete
+"/" Means task is incomplete
+"*" Means footnotes about implementation
+----------------------------------------
+* Create Sprite super class
+  * Actually not sure about this, but i think the consolidation will make future changes easier
+* Build up a foundation to base everything around the center of a sprite instead of the top left corner
+* Change the createPlatforms method to take a csv file as an input and build the level off of the csv file
+  * Don't worry about the camera stuff just yet, just have the method save all the data into an arraylist for now
+* Redo Collision systems again for the 5th time in a row
+* Implement the ability to load an image for sprites

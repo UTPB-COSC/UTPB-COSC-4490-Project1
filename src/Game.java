@@ -1,216 +1,170 @@
 package src;
 
-import javax.imageio.ImageIO;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
-import javax.sound.sampled.FloatControl;
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
-import java.awt.image.BufferedImage;
-import java.io.*;
+import GameObjects.*;
+import LevelEditor.*;
+import Collision.BoxCollider;
 
+import java.io.*;
+import java.awt.*;
+import javax.swing.*;
+import java.awt.event.*;
+import java.io.IOException;
+import java.util.ArrayList;
+
+/*
+ * Class responsible for handling all the game logic, entry point for program
+ */
 public class Game implements Runnable
 {
+    public Toolkit tk;
     private final GameCanvas canvas;
+    public final int SPRITE_SIZE = 100;
 
+    //Player movement clamps and flags
+    public Player player;
+    private boolean goRight = false;
+    private boolean goLeft = false;
+    public final double MAX_X_SPEED = 5;
+    public final double ACCELERATION = 0.1;
+    public final float JUMP_SPEED = 14f;
+
+    //Related to fps
     private final double rateTarget = 100.0;
     public double waitTime = 1000.0 / rateTarget;
     public double rate = 1000 / waitTime;
 
-    public Bird bird;
-    public int mouseX;
-    public int mouseY;
-    public int fireRate = 10;
-    public int fireCounter = 0;
-    public boolean firing = false;
+    //Array objects needed to load level data
+    public ArrayList<Sprite> platforms;
+    public ArrayList<Enemy> enemies;
 
-    public Pipe[] pipes = new Pipe[5];
-    private int pipeCount = 1;
-
-    public int highScore = 0;
-    public int score = 0;
-
-    public Toolkit tk;
+    //Misc.
     public boolean debug = false;
     public boolean running = true;
+    public boolean isGameOver = false;
     public double volume = 0.3;
-    public boolean randomGaps = false;
-    public double difficulty = 0.0;
-    public boolean ramping = false;
-
-    private int pipeWidth;
-    private int pipeHeight;
-    public BufferedImage pipeImage;
-    public BufferedImage flippedPipe;
-
-    public BufferedImage[] cloudImage = new BufferedImage[21];
-    private final int cloudCap = 20;
-    public Cloud[] clouds = new Cloud[cloudCap];
-    private int cloudCount = 0;
-    private final double cloudRate = 0.005;
 
     public Game()
     {
+        //Initializes a JFrame
         JFrame frame = new JFrame("Game");
-
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
         frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-
         frame.setUndecorated(true);
 
+        //Gets Screen Size
         tk = Toolkit.getDefaultToolkit();
+        System.out.println("Screen Width: " + tk.getScreenSize().width + ", Screen Height: " + tk.getScreenSize().height);
 
         frame.setVisible(true);
         frame.requestFocus();
 
+        //From this point on, the program can draw to the JFrame
+        canvas = new GameCanvas(this, frame.getGraphics());
+        frame.add(canvas);
+
+        //Starts loading file data into necessary arrays
         try {
-            File scoreFile = new File("score.txt");
-            if(!scoreFile.exists())
-            {
-                highScore = 0;
-            } else {
-                try {
-                    FileReader fr = new FileReader(scoreFile);
-                    BufferedReader br = new BufferedReader(fr);
-                    highScore = Integer.parseInt(br.readLine());
-                    br.close();
-                    fr.close();
-                } catch (Exception ex) {
-                    highScore = 0;
-                }
-            }
+            platforms = new ArrayList<>();
+            enemies = new ArrayList<>();
 
-            bird = new Bird(this, tk);
+            //I have to do a funky workaround for pass by reference when loading player data
+            Player[] playerRef = new Player[1];
+            LevelLoader.readCSV(new File(".\\LevelEditor\\test_level.csv"), SPRITE_SIZE, platforms, enemies, playerRef);
 
-            BufferedImage image = ImageIO.read(new File("pipe.png"));
+            //LevelLoader.createLevel(tileGrid, SPRITE_SIZE, platforms, enemies, playerRef);
+            player = playerRef[0];
 
-            pipeWidth = tk.getScreenSize().width / 16;
-            pipeHeight = (int)(((double)pipeWidth / (double)image.getWidth()) * image.getHeight());
-
-            Image temp = image.getScaledInstance(pipeWidth, pipeHeight, BufferedImage.SCALE_SMOOTH);
-            pipeImage = new BufferedImage(pipeWidth, pipeHeight, BufferedImage.TYPE_INT_ARGB);
-            Graphics g = pipeImage.getGraphics();
-            g.drawImage(temp, 0, 0, null);
-            g.dispose();
-
-            AffineTransform at = new AffineTransform();
-            at.rotate(Math.PI, image.getWidth() / 2, image.getHeight() / 2);
-            AffineTransformOp ato = new AffineTransformOp(at, AffineTransformOp.TYPE_BILINEAR);
-            BufferedImage flipped = ato.filter(image, null);
-
-            temp = flipped.getScaledInstance(pipeWidth, pipeHeight, BufferedImage.SCALE_SMOOTH);
-            flippedPipe = new BufferedImage(pipeWidth, pipeHeight, BufferedImage.TYPE_INT_ARGB);
-            g = flippedPipe.getGraphics();
-            g.drawImage(temp, 0, 0, null);
-            g.dispose();
-
-            Pipe pipe = new Pipe(this, tk, tk.getScreenSize().height / 2, pipeWidth, pipeHeight);
-            pipes[0] = pipe;
-
-            image = ImageIO.read(new File("clouds.png"));
-            int fragHeight = image.getHeight() / 21;
-            for (int i = 0; i < cloudImage.length; i++)
-            {
-                temp = image.getSubimage(0, i * fragHeight, image.getWidth(), fragHeight);
-                cloudImage[i] = new BufferedImage(image.getWidth(), fragHeight, BufferedImage.TYPE_INT_ARGB);
-                g = cloudImage[i].getGraphics();
-                g.drawImage(temp, 0, 0, null);
-                g.dispose();
-            }
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
+            //Debug print statements
+            System.out.println("Platform Amount: " + platforms.size());
+            System.out.println("Enemies Amount: " + enemies.size());
+            System.out.println("Player Center X: " + player.box.centerX + ", Player Center Y: " + player.box.centerY);
+            System.out.println("Player Top: " + player.box.getTop() + ", Player Bottom: " + player.box.getBottom() + ", Player Left: " + player.box.getLeft() + ", Player Right: " + player.box.getRight());
+        } catch (IOException e) {
+            System.err.println("Error reading file");
             System.exit(0);
         }
 
-        canvas = new GameCanvas(this, frame.getGraphics(), tk);
-        frame.add(canvas);
-
+        //Startins drawing to the JFrame
         Thread drawLoop = new Thread(canvas);
         drawLoop.start();
 
+        //Player controls
         frame.addKeyListener(new KeyListener()
         {
             @Override
             public void keyTyped(KeyEvent e)
             {
+
             }
 
             @Override
             public void keyPressed(KeyEvent e)
             {
-                if(e.getKeyCode() == KeyEvent.VK_SPACE)
-                {
-                    if (running)
-                        bird.flap();
-                }
-                if(e.getKeyCode() == KeyEvent.VK_ESCAPE)
-                {
-                    running = !running;
-                }
-                if(e.getKeyCode() == KeyEvent.VK_UP)
-                {
-                    if (!running)
-                    {
-                        canvas.cursor--;
-                        canvas.cursor = Math.max(canvas.cursor, 0);
-                    }
-                }
-                if(e.getKeyCode() == KeyEvent.VK_DOWN)
-                {
-                    if (!running)
-                    {
-                        canvas.cursor++;
-                        canvas.cursor = Math.min(canvas.cursor, 6);
-                    }
-                }
-                if(e.getKeyCode() == KeyEvent.VK_RIGHT)
-                {
-                    if (!running)
-                    {
-                        if (canvas.cursor == 2) {
-                            volume += 0.1;
-                            volume = Math.min(volume, 1.0);
-                        }
-                        if (canvas.cursor == 4) {
-                            difficulty += 0.5;
-                            difficulty = Math.min(difficulty, 3.0);
+                switch(e.getKeyCode()) {
+                    case KeyEvent.VK_SPACE -> {
+                        if(running) {
+                            if(BoxCollider.isOnPlatforms(player, platforms)) {
+                                player.yVel -= JUMP_SPEED;
+                            }
                         }
                     }
-                }
-                if(e.getKeyCode() == KeyEvent.VK_LEFT)
-                {
-                    if (!running)
-                    {
-                        if (canvas.cursor == 2) {
-                            volume -= 0.1;
-                            volume = Math.max(volume, 0.0);
-                        }
-                        if (canvas.cursor == 4) {
-                            difficulty -= 0.5;
-                            difficulty = Math.max(difficulty, 0.0);
+                    case KeyEvent.VK_ESCAPE -> {
+                        running = !running;
+                    }
+                    case KeyEvent.VK_UP -> {
+                        if(!running) {
+                            canvas.cursor--;
+                            canvas.cursor = Math.max(canvas.cursor, 0);
                         }
                     }
-                }
-                if(e.getKeyCode() == KeyEvent.VK_ENTER)
-                {
-                    if (!running)
-                    {
-                        if (canvas.cursor == 0)
-                            reset();
-                        if (canvas.cursor == 1)
-                            System.exit(0);
-                        if (canvas.cursor == 3)
-                            randomGaps = !randomGaps;
-                        if (canvas.cursor == 5)
-                            ramping = !ramping;
-                        if (canvas.cursor == 6)
-                            debug = !debug;
+                    case KeyEvent.VK_DOWN -> {
+                        if(!running) {
+                            canvas.cursor++;
+                            canvas.cursor = Math.min(canvas.cursor, 6);
+                        }
+                    }
+                    case KeyEvent.VK_RIGHT -> {
+                        if(!running) {
+                            if(canvas.cursor == 2) {
+                                volume += 0.1;
+                                volume = Math.min(volume, 1.0);
+                            }
+                        }
+                    }
+                    case KeyEvent.VK_LEFT -> {
+                        if(!running) {
+                            if(canvas.cursor == 2) {
+                                volume -= 0.1;
+                                volume = Math.max(volume, 0.0);
+                            }
+                        }
+                    }
+                    case KeyEvent.VK_ENTER -> {
+                        if(!running) {
+                            switch(canvas.cursor) {
+                                case 0 -> { reset(); }
+                                case 1 -> { System.exit(0); }
+                                case 6 -> { debug = !debug; }
+                            }
+                        }
+                    }
+                    case KeyEvent.VK_W -> {
+
+                    }
+                    //Move Left
+                    case KeyEvent.VK_A -> {
+                        goLeft = true;
+                    }
+                    case KeyEvent.VK_S -> {
+
+                    }
+                    //Move Right
+                    case KeyEvent.VK_D -> {
+                        goRight = true;
+                    }
+                    //Enables and disables debug
+                    case KeyEvent.VK_1 -> {
+                        debug = !debug;
                     }
                 }
             }
@@ -218,61 +172,23 @@ public class Game implements Runnable
             @Override
             public void keyReleased(KeyEvent e)
             {
-            }
-        });
-
-        frame.addMouseListener(new MouseListener() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (e.getButton() == MouseEvent.BUTTON1) {
-                    firing = true;
+                switch(e.getKeyCode()) {
+                    //Stops moving left
+                    case KeyEvent.VK_A -> {
+                        player.xVel = 0;
+                        goLeft = false;
+                    }
+                    //Stops moving right
+                    case KeyEvent.VK_D -> {
+                        player.xVel = 0;
+                        goRight = false;
+                    }
                 }
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                if (e.getButton() == MouseEvent.BUTTON1) {
-                    firing = false;
-                }
-            }
-
-            @Override
-            public void mouseEntered(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-
-            }
-        });
-
-        frame.addMouseMotionListener(new MouseMotionListener() {
-            @Override
-            public void mouseDragged(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseMoved(MouseEvent e) {
-                mouseX = e.getX();
-                mouseY = e.getY();
-            }
-        });
-
-        frame.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseWheelMoved(MouseWheelEvent e) {
-
             }
         });
     }
 
+    //Game Logic starts
     @Override
     public void run()
     {
@@ -282,95 +198,23 @@ public class Game implements Runnable
 
             if (running)
             {
-                fireCounter -= 1;
-                fireCounter = Math.max(fireCounter, 0);
-                if (firing && fireCounter == 0)
-                {
-                    // spawn new bullet and add to bullet array
-                    fireCounter = 10;
+                if(goLeft) {
+                    player.xVel -= 0.1f;
+                    player.moveHorizontal();
                 }
-                // for each bullet within drawable space:
-                //   perform update
-                //   check for collisions
-                //   if collide():
-                //     do something
-
-                if (Math.random() < cloudRate)
-                {
-                    cloudCount++;
-                    if (cloudCount >= clouds.length)
-                        cloudCount = 0;
-                    if (clouds[cloudCount] == null || clouds[cloudCount].passed)
-                    {
-                        Cloud c = new Cloud(this, tk);
-                        clouds[cloudCount] = c;
-                    }
-                }
-                for (int i = 0; i < clouds.length; i++)
-                {
-                    if(clouds[i] != null)
-                        clouds[i].update();
+                
+                if(goRight) {
+                    player.xVel += 0.1f;
+                    player.moveHorizontal();
                 }
 
-                bird.update();
-                for (int i = 0; i < pipes.length; i++) {
-                    if (pipes[i] == null)
-                        continue;
+                //player.dMoveLeft();
 
-                    if (pipes[i].update()) {
-                        score += 1;
-
-                        if (ramping && score % 10 == 0)
-                        {
-                            difficulty += 0.5;
-                            difficulty = Math.min(difficulty, 3.0);
-                        }
-
-                        if (score > highScore)
-                        {
-                            new Thread(() -> {
-                                highScore = score;
-                                running = true;
-                                try {
-                                    File scoreFile = new File("score.txt");
-                                    PrintWriter pw = new PrintWriter(scoreFile);
-                                    pw.write(String.format("%d%n", highScore));
-                                    pw.close();
-                                } catch (Exception ex) {
-                                    ex.printStackTrace();
-                                }
-                            }).start();
-                        }
-
-                        new Thread(() -> {
-                            try {
-                                AudioInputStream ais = AudioSystem.getAudioInputStream(new File("score.wav").getAbsoluteFile());
-                                Clip clip = AudioSystem.getClip();
-                                clip.open(ais);
-                                FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-                                gain.setValue(20f * (float) Math.log10(volume));
-                                clip.start();
-                            } catch (Exception ex) {
-                                ex.printStackTrace();
-                            }
-                        }).start();
-                    }
-
-                    if (pipes[i].spawnable && pipes[i].xPos < 3 * tk.getScreenSize().width / 4) {
-                        pipes[i].spawnable = false;
-                        int min = tk.getScreenSize().height / 4;
-                        int range = min * 2;
-                        int y = (int) (Math.random() * range) + min;
-                        Pipe pipe = new Pipe(this, tk, y, pipeWidth, pipeHeight);
-                        pipes[pipeCount] = pipe;
-                        pipeCount++;
-                        if (pipeCount >= pipes.length)
-                            pipeCount = 0;
-                    }
-
-                    if (bird.collide(pipes[i])) {
-                        running = !running;
-                    }
+                //Checks for collisions and resolves them
+                BoxCollider.resolvePlatformCollisions(player, platforms);
+                for(Sprite enemy : enemies) {
+                    enemy.update();
+                    BoxCollider.resolvePlatformCollisions(enemy, platforms);
                 }
             }
 
@@ -380,38 +224,15 @@ public class Game implements Runnable
             try
             {
                 Thread.sleep(Math.max(sleep, 0));
-            } catch (InterruptedException ex)
-            {
+            } catch (InterruptedException ex) {
+                System.err.println(ex.getMessage());
+                System.exit(0);
             }
         }
     }
 
     public void reset()
     {
-        if (score > highScore)
-        {
-            highScore = score;
-            running = true;
-            try {
-                File scoreFile = new File("score.txt");
-                PrintWriter pw = new PrintWriter(scoreFile);
-                pw.write(String.format("%d%n", highScore));
-                pw.close();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }
-
-        bird.reset();
-        pipes = new Pipe[5];
-        Pipe p = new Pipe(this, tk, tk.getScreenSize().height / 2, pipeWidth, pipeHeight);
-        pipes[0] = p;
-        pipeCount = 1;
-        score = 0;
-
-        clouds = new Cloud[cloudCap];
-        cloudCount = 0;
-
         running = true;
     }
 
