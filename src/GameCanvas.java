@@ -10,10 +10,20 @@ public class GameCanvas extends JPanel implements Runnable
     private Game game;
     private Graphics graphics;
     Toolkit tk;
+    private int scrWidth;
+    private int scrHeight;
+    private BufferedImage currentFrame;
+    private BufferedImage lastFrame;
 
     private final double rateTarget = 60.0;
     private double waitTime = 1000.0 / rateTarget;
     private double rate = 1000.0 / waitTime;
+
+    private final int runningAverageTime = 30;
+    private final int frameBufferSize = (int)(rateTarget * runningAverageTime);
+    private double[] frameBuffer = new double[frameBufferSize];
+    private int frameBufferIndex = 0;
+    private double lastFrameTime = 0.0;
 
     public int cursor = 0;
     public int crosshairSize = 30;
@@ -23,6 +33,27 @@ public class GameCanvas extends JPanel implements Runnable
         this.game = game;
         graphics = g;
         this.tk = tk;
+        scrWidth = tk.getScreenSize().width;
+        scrHeight = tk.getScreenSize().height;
+        currentFrame = new BufferedImage(scrWidth, scrHeight, BufferedImage.TYPE_INT_ARGB);
+    }
+
+    private double getAverageFPS() {
+        int numEntries = Math.min(frameBufferIndex, frameBufferSize);
+        double total = 0.0;
+        for (int i = 0; i < numEntries; i++) {
+            total += frameBuffer[i];
+        }
+        return total / numEntries;
+    }
+
+    private double getAverageUPS() {
+        int numEntries = Math.min(game.updateBufferIndex, game.updateBufferSize);
+        double total = 0.0;
+        for (int i = 0; i < numEntries; i++) {
+            total += game.updateBuffer[i];
+        }
+        return total / numEntries;
     }
 
     @Override
@@ -30,28 +61,31 @@ public class GameCanvas extends JPanel implements Runnable
         while(true)
         {
             long startTime = System.nanoTime();
-
-            int width = tk.getScreenSize().width;
-            int height = tk.getScreenSize().height;
-
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = image.createGraphics();
+            Graphics2D g2d = currentFrame.createGraphics();
 
             g2d.setColor(Color.CYAN);
-            g2d.fillRect(0, 0, width, height);
+            g2d.fillRect(0, 0, scrWidth, scrHeight);
 
+            long cloudStart = System.nanoTime();
+            int numClouds = 0;
             for (int i = 0; i < game.clouds.length; i++)
             {
-                if (game.clouds[i] != null && !game.clouds[i].passed)
+                if (game.clouds[i] != null && !game.clouds[i].passed) {
                     game.clouds[i].drawCloud(g2d);
+                    numClouds++;
+                }
             }
+            long cloudDelta = System.nanoTime() - cloudStart;
+            double cloudTime = cloudDelta / 1_000_000.0;
 
             game.bird.drawBird(g2d);
 
+            /*
             g2d.setColor(Color.RED);
             g2d.drawOval(game.mouseX - crosshairSize, game.mouseY - crosshairSize, crosshairSize*2, crosshairSize*2);
             g2d.drawLine(game.mouseX - crosshairSize, game.mouseY, game.mouseX+crosshairSize, game.mouseY);
             g2d.drawLine(game.mouseX, game.mouseY-crosshairSize, game.mouseX, game.mouseY+crosshairSize);
+            */
 
             for (int i = 0; i < game.pipes.length; i++)
             {
@@ -95,11 +129,24 @@ public class GameCanvas extends JPanel implements Runnable
             if (game.debug) {
                 g2d.drawString(String.format("FPS = %.1f", rate), 200, 25);
                 g2d.drawString(String.format("UPS = %.1f", game.rate), 200, 50);
+                g2d.drawString(String.format("Frame Time Avg = %.2f ms", getAverageFPS()), 300, 25);
+                g2d.drawString(String.format("Update Time Avg = %.2f ms", getAverageUPS()), 300, 50);
+                g2d.drawString(String.format("Last Frame Time = %.2f ms", lastFrameTime), 500, 25);
+                g2d.drawString(String.format("Last Update Time = %.2f ms", game.lastUpdateTime), 500, 50);
+                g2d.drawString(String.format("Num Clouds = %d", numClouds), 100, 75);
+                g2d.drawString(String.format("Cloud Time = %.2f ms", cloudTime), 300, 75);
+                g2d.drawString(String.format("Per Cloud Time = %.2f ms", cloudTime / numClouds), 500, 75);
             }
 
-            graphics.drawImage(image, 0, 0, null);
+            graphics.drawImage(currentFrame, 0, 0, null);
+            //lastFrame = currentFrame;
 
-            long sleep = (long) waitTime - (System.nanoTime() - startTime) / 1000000;
+            long deltaTime = System.nanoTime() - startTime;
+            lastFrameTime = deltaTime / 1_000_000.0;
+            frameBuffer[frameBufferIndex % frameBufferSize] = lastFrameTime;
+            frameBufferIndex += 1;
+
+            long sleep = (long) waitTime - (System.nanoTime() - startTime) / 1_000_000;
             rate = 1000.0 / Math.max(waitTime - sleep, waitTime);
 
             try

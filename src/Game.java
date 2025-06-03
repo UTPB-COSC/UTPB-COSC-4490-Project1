@@ -21,6 +21,12 @@ public class Game implements Runnable
     public double waitTime = 1000.0 / rateTarget;
     public double rate = 1000 / waitTime;
 
+    private final int runningAverageTime = 30;
+    public final int updateBufferSize = (int)(runningAverageTime * rateTarget);
+    public double[] updateBuffer = new double[updateBufferSize];
+    public int updateBufferIndex = 0;
+    public double lastUpdateTime = 0.0;
+
     public Bird bird;
     public int mouseX;
     public int mouseY;
@@ -35,7 +41,7 @@ public class Game implements Runnable
     public int score = 0;
 
     public Toolkit tk;
-    public boolean debug = false;
+    public boolean debug = true;
     public boolean running = true;
     public double volume = 0.3;
     public boolean randomGaps = false;
@@ -374,7 +380,12 @@ public class Game implements Runnable
                 }
             }
 
-            long sleep = (long) waitTime - (System.nanoTime() - startTime) / 1000000;
+            long deltaTime = System.nanoTime() - startTime;
+            lastUpdateTime = deltaTime / 1_000_000.0;
+            updateBuffer[updateBufferIndex % updateBufferSize] = lastUpdateTime;
+            updateBufferIndex += 1;
+
+            long sleep = (long) waitTime - (System.nanoTime() - startTime) / 1_000_000;
             rate = 1000.0 / Math.max(waitTime - sleep, waitTime);
 
             try
